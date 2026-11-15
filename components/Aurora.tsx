@@ -1,0 +1,11 @@
+'use client';
+import { Component, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { ScreenQuad } from '@react-three/drei';
+import * as THREE from 'three';
+const vertex = `varying vec2 vUv; void main(){vUv=position.xy*.5+.5;gl_Position=vec4(position.xy,0.,1.);}`;
+const fragment = `uniform float uTime; varying vec2 vUv;
+void main(){vec2 p=vUv;float wave=sin(p.x*4.+uTime*.12)*.07;vec3 red=vec3(.74,.015,.012);vec3 orange=vec3(.95,.27,.015);vec3 c=mix(red,orange,smoothstep(.18,.95,p.y+sin(p.x*6.+uTime*.1)*.24));float glow=exp(-length((p-vec2(.1,.22+wave))*vec2(1.7,4.5))*3.);c+=glow*vec3(.38,.14,0.);float dark=1.-smoothstep(.0,.38,p.y+sin(p.x*2.)*.09);c=mix(c,vec3(.035,.015,.01),dark*.95);gl_FragColor=vec4(c,1.);}`;
+function Field({ paused }: { paused: boolean }) { const material=useRef<THREE.ShaderMaterial>(null);const uniforms=useMemo(()=>({uTime:{value:0}}),[]);useFrame((_,dt)=>{if(!paused&&material.current)material.current.uniforms.uTime.value+=Math.min(dt,.04);});return <ScreenQuad><shaderMaterial ref={material} uniforms={uniforms} vertexShader={vertex} fragmentShader={fragment} depthWrite={false} /></ScreenQuad>; }
+class Boundary extends Component<{children:ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return {failed:true};}render(){return this.state.failed?null:this.props.children;}}
+export default function Aurora({paused}:{paused:boolean}) {const ref=useRef<HTMLDivElement>(null);const [supported,setSupported]=useState(false);const [visible,setVisible]=useState(true);useEffect(()=>{const canvas=document.createElement('canvas');const gl=canvas.getContext('webgl2');setSupported(!!gl);gl?.getExtension('WEBGL_lose_context')?.loseContext();const observer=new IntersectionObserver(([e])=>setVisible(e.isIntersecting));if(ref.current)observer.observe(ref.current);return ()=>observer.disconnect();},[]);return <div className="aurora" ref={ref} aria-hidden="true" data-renderer={supported?'webgl':'css'}>{supported&&<Boundary><Canvas resize={{offsetSize:true}} dpr={[1,1.25]} frameloop={paused||!visible?'demand':'always'} gl={{alpha:false,antialias:false,powerPreference:'low-power'}}><Field paused={paused||!visible}/></Canvas></Boundary>}</div>;}
